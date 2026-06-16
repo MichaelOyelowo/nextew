@@ -252,6 +252,129 @@
   font-size: 14px;
 }
 
+.upload-grid {
+  display: grid;
+  gap: 18px;
+  padding: 32px;
+  border-radius: 20px;
+}
+
+.file-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.file-item {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
+  align-items: center;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px;
+  text-align: left;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.file-item.active {
+  border-color: var(--primary);
+  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.12);
+}
+
+.file-item img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.crop-board {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.crop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.crop-preview {
+  position: relative;
+  min-height: 340px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--bg-subtle);
+}
+
+.cropper-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.crop-controls {
+  display: grid;
+  gap: 12px;
+}
+
+.format-select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  outline: none;
+}
+
+.processed-list {
+  display: grid;
+  gap: 14px;
+}
+
+.processed-item {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: white;
+}
+
+.processed-item img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.btn-ghost-sm {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.btn-download-sm {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
 @media (max-width: 900px) {
   .resize-content {
     grid-template-columns: 1fr;

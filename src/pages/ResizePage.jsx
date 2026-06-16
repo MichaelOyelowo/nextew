@@ -1,5 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import Cropper from 'react-easy-crop'
+import JSZip from 'jszip'
 import './ResizePage.css'
+
+const OUTPUT_FORMATS = [
+  { label: 'PNG', value: 'png' },
+  { label: 'JPG', value: 'jpeg' },
+  { label: 'WebP', value: 'webp' },
+  { label: 'AVIF', value: 'avif' },
+]
 
 const PRESET_MAP = [
   { label: 'Instagram story', width: 1080, height: 1920 },
@@ -90,17 +99,15 @@ const askGeminiWorker = async (prompt) => {
   const res = await fetch(import.meta.env.VITE_RESIZE_WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt })
+    body: JSON.stringify({ prompt }),
   })
 
-  // Always read response text so we can show useful errors when the worker fails
   const text = await res.text()
 
   let data
   try {
     data = text ? JSON.parse(text) : null
   } catch (err) {
-    // If the worker returned non-JSON, include the raw text in the error
     throw new Error(`Worker returned invalid response: ${text || '[empty]'}`)
   }
 
@@ -115,46 +122,92 @@ const askGeminiWorker = async (prompt) => {
   return {
     width: data.width,
     height: data.height,
-    message: ` AI parsed: ${data.width} x ${data.height}px`
+    message: `AI parsed: ${data.width} x ${data.height}px`,
   }
 }
 
-const resizeImage = async (file, width, height) => {
+const createImage = (src) => new Promise((resolve, reject) => {
   const image = new Image()
-  const imageUrl = URL.createObjectURL(file)
-  image.src = imageUrl
-  await new Promise((resolve, reject) => {
-    image.onload = resolve
-    image.onerror = reject
-  })
+  image.crossOrigin = 'anonymous'
+  image.onload = () => resolve(image)
+  image.onerror = reject
+  image.src = src
+})
 
+const createDefaultCrop = (imageWidth, imageHeight, width, height) => {
+  const targetAspect = width / height
+  const imageAspect = imageWidth / imageHeight
+
+  if (imageAspect > targetAspect) {
+    const cropWidth = imageHeight * targetAspect
+    return {
+      x: (imageWidth - cropWidth) / 2,
+      y: 0,
+      width: cropWidth,
+      height: imageHeight,
+    }
+  }
+
+  const cropHeight = imageWidth / targetAspect
+  return {
+    x: 0,
+    y: (imageHeight - cropHeight) / 2,
+    width: imageWidth,
+    height: cropHeight,
+  }
+}
+
+const getOutputMimeType = (format) => {
+  if (format === 'jpeg') return 'image/jpeg'
+  if (format === 'webp') return 'image/webp'
+  if (format === 'avif') return 'image/avif'
+  return 'image/png'
+}
+
+const getExtension = (format) => (format === 'jpeg' ? 'jpg' : format)
+
+const getCroppedImageBlob = async (file, cropAreaPixels, width, height, format) => {
+  const imageUrl = URL.createObjectURL(file)
+  const image = await createImage(imageUrl)
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-
   ctx.fillStyle = '#fff'
   ctx.fillRect(0, 0, width, height)
-  ctx.drawImage(image, 0, 0, width, height)
+
+  ctx.drawImage(
+    image,
+    cropAreaPixels.x,
+    cropAreaPixels.y,
+    cropAreaPixels.width,
+    cropAreaPixels.height,
+    0,
+    0,
+    width,
+    height,
+  )
 
   URL.revokeObjectURL(imageUrl)
 
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
       resolve(blob)
-    }, 'image/png')
+    }, getOutputMimeType(format), 0.92)
   })
 }
 
 function ResizePage() {
-  const [file, setFile] = useState(null)
-  const [previewUrl, setPreviewUrl] = useState(null)
+  const [files, setFiles] = useState([])
   const [prompt, setPrompt] = useState('')
   const [parsed, setParsed] = useState(null)
   const [status, setStatus] = useState('idle')
-  const [resultUrl, setResultUrl] = useState(null)
   const [error, setError] = useState(null)
-  const [isDragging, setIsDragging] = useState(false)
+  const [outputFormat, setOutputFormat] = useState('png')
+  const [activeFileId, setActiveFileId] = useState(null)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -167,44 +220,62 @@ function ResizePage() {
 
   useEffect(() => {
     return () => {
-      if (resultUrl) {
-        URL.revokeObjectURL(resultUrl)
-      }
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
-      }
+      files.forEach((fileItem) => {
+        URL.revokeObjectURL(fileItem.preview)
+        URL.revokeObjectURL(fileItem.resultUrl)
+      })
     }
-  }, [resultUrl, previewUrl])
+  }, [files])
 
-  const handleFileChange = (files) => {
-    const imageFile = Array.from(files).find((f) => f.type.startsWith('image/'))
-    if (!imageFile) return
+  const updateFile = useCallback((id, updates) => {
+    setFiles((prev) => prev.map((fileItem) => (fileItem.id === id ? { ...fileItem, ...updates } : fileItem)))
+  }, [])
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-    }
+  const handleFiles = async (incoming) => {
+    const imageFiles = Array.from(incoming).filter((f) => f.type.startsWith('image/'))
+    if (imageFiles.length === 0) return
 
-    setFile(imageFile)
-    setPreviewUrl(URL.createObjectURL(imageFile))
-    setResultUrl(null)
-    setStatus('idle')
+    const mapped = await Promise.all(imageFiles.map(async (fileItem) => {
+      const preview = URL.createObjectURL(fileItem)
+      let width = 0
+      let height = 0
+      try {
+        const image = await createImage(preview)
+        width = image.width
+        height = image.height
+      } catch (err) {
+        console.warn('Failed to read image dimensions', err)
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        file: fileItem,
+        name: fileItem.name,
+        preview,
+        status: 'idle',
+        resultUrl: null,
+        resultBlob: null,
+        error: null,
+        width,
+        height,
+        crop: { x: 0, y: 0 },
+        zoom: 1,
+        croppedAreaPixels: null,
+      }
+    }))
+
+    setFiles((prev) => [...prev, ...mapped])
+    setActiveFileId((prev) => prev || mapped[0]?.id)
     setError(null)
   }
 
   const handleDrop = (e) => {
     e.preventDefault()
-    setIsDragging(false)
-    handleFileChange(e.dataTransfer.files)
+    handleFiles(e.dataTransfer.files)
   }
 
   const handleDragOver = (e) => {
     e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
   }
 
   const handleDropzoneKeyDown = (e) => {
@@ -214,9 +285,24 @@ function ResizePage() {
     }
   }
 
-  const handleResize = async () => {
-    if (!file) {
-      setError('Upload an image first.')
+  const handleCropComplete = useCallback((_, croppedPixels) => {
+    setCroppedAreaPixels(croppedPixels)
+    if (!activeFileId) return
+    updateFile(activeFileId, { croppedAreaPixels: croppedPixels })
+  }, [activeFileId, updateFile])
+
+  const activeFile = files.find((fileItem) => fileItem.id === activeFileId)
+
+  useEffect(() => {
+    if (!activeFile) return
+    setCrop(activeFile.crop || { x: 0, y: 0 })
+    setZoom(activeFile.zoom || 1)
+    setCroppedAreaPixels(activeFile.croppedAreaPixels || null)
+  }, [activeFile])
+
+  const handleResizeAll = async () => {
+    if (files.length === 0) {
+      setError('Upload at least one image first.')
       return
     }
     if (!prompt.trim()) {
@@ -227,89 +313,136 @@ function ResizePage() {
     setError(null)
     setStatus('processing')
 
+    let dimensions = parseResizePrompt(prompt)
     try {
-      let dimensions = parseResizePrompt(prompt)
       if (!dimensions) {
         setStatus('asking-ai')
         dimensions = await askGeminiWorker(prompt)
       }
-
-      setStatus('processing')
-      const blob = await resizeImage(file, dimensions.width, dimensions.height)
-      const url = URL.createObjectURL(blob)
-      setResultUrl(url)
-      setParsed(dimensions)
-      setStatus('done')
     } catch (err) {
-      console.error(err)
-      setError(err.message || 'Could not understand that prompt. Try something like "1080x1920" or "Instagram story size".')
       setStatus('error')
+      setError(err.message || 'Unable to parse prompt')
+      return
+    }
+
+    setStatus('processing')
+    setParsed(dimensions)
+
+    await Promise.all(files.map(async (fileItem) => {
+      updateFile(fileItem.id, { status: 'processing', error: null })
+      try {
+        const cropArea = fileItem.croppedAreaPixels || createDefaultCrop(fileItem.width, fileItem.height, dimensions.width, dimensions.height)
+        const blob = await getCroppedImageBlob(fileItem.file, cropArea, dimensions.width, dimensions.height, outputFormat)
+        const resultUrl = URL.createObjectURL(blob)
+        updateFile(fileItem.id, {
+          status: 'done',
+          resultUrl,
+          resultBlob: blob,
+          width: dimensions.width,
+          height: dimensions.height,
+        })
+      } catch (err) {
+        updateFile(fileItem.id, {
+          status: 'error',
+          error: err.message || 'Failed to process image',
+        })
+      }
+    }))
+
+    setStatus('done')
+  }
+
+  const handleDownloadFile = (fileItem) => {
+    if (!fileItem.resultUrl) return
+    const a = document.createElement('a')
+    a.href = fileItem.resultUrl
+    const ext = getExtension(outputFormat)
+    a.download = fileItem.name.replace(/\.[^.]+$/, '') + `_${fileItem.width}x${fileItem.height}.${ext}`
+    a.click()
+  }
+
+  const handleDownloadZip = async () => {
+    const readyFiles = files.filter((fileItem) => fileItem.status === 'done' && fileItem.resultBlob)
+    if (readyFiles.length === 0) {
+      setError('Process images first before downloading a ZIP.')
+      return
+    }
+
+    const zip = new JSZip()
+    readyFiles.forEach((fileItem) => {
+      const ext = getExtension(outputFormat)
+      zip.file(`${fileItem.name.replace(/\.[^.]+$/, '')}_${fileItem.width}x${fileItem.height}.${ext}`, fileItem.resultBlob)
+    })
+
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `resized-images-${outputFormat}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const removeFile = (id) => {
+    setFiles((prev) => prev.filter((fileItem) => fileItem.id !== id))
+    if (activeFileId === id) {
+      setActiveFileId((prevId) => {
+        const remaining = files.filter((fileItem) => fileItem.id !== id)
+        return remaining[0]?.id || null
+      })
     }
   }
 
-  const handleDownload = () => {
-    if (!resultUrl || !file) return
-    const a = document.createElement('a')
-    a.href = resultUrl
-    a.download = file.name.replace(/\.[^.]+$/, '') + `_${parsed?.width}x${parsed?.height}.png`
-    a.click()
+  const clearAll = () => {
+    setFiles([])
+    setActiveFileId(null)
+    setStatus('idle')
+    setError(null)
+    setParsed(null)
   }
 
   return (
     <div className="resize-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">AI-style Image Resize</h1>
+          <h1 className="page-title">AI Bulk Resize + Draggable Crop</h1>
           <p className="page-sub">
-            Upload an image, type a prompt, and resize instantly with smart prompt parsing.
+            Upload one or more images, choose a prompt, drag each image inside the frame, and export in PNG, JPG, WebP, or AVIF.
           </p>
         </div>
       </div>
 
       <div className="resize-content">
         <div className="resize-panel">
-          <label
-            className={`upload-card ${isDragging ? 'dragging' : ''}`}
-            htmlFor="resize-upload"
+          <div
+            className="upload-card upload-grid"
             role="button"
             tabIndex="0"
-            aria-label="Upload or drop an image"
+            aria-label="Upload images"
+            onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
             onKeyDown={handleDropzoneKeyDown}
           >
             <input
-              id="resize-upload"
+              ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               hidden
-              ref={fileInputRef}
-              onChange={(e) => handleFileChange(e.target.files)}
+              onChange={(e) => handleFiles(e.target.files)}
             />
-            <div className="upload-preview">
-              {file ? (
-                <img src={previewUrl} alt="Uploaded" className="upload-image" />
-              ) : (
-                <div className="upload-placeholder">
-                  <span>📁</span>
-                  <p>Select an image</p>
-                  <small>PNG, JPEG, or WebP</small>
-                </div>
-              )}
+            <div className="upload-placeholder">
+              <span>??</span>
+              <p>{files.length > 0 ? `${files.length} image(s) ready` : 'Click or drop images here'}</p>
+              <small>PNG, JPEG, WebP supported. Drag each image into the frame after upload.</small>
             </div>
-            <button 
-              type="button" 
-              className="btn-primary upload-button"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {file ? 'Change Image' : 'Upload Image'}
-            </button>
-          </label>
+            <button type="button" className="btn-primary upload-button">Add Images</button>
+          </div>
 
           <div className="prompt-card">
             <label className="label" htmlFor="resize-prompt">
-              Resize with AI prompt
+              Resize prompt
             </label>
             <textarea
               id="resize-prompt"
@@ -325,40 +458,138 @@ function ResizePage() {
                 <span className="prompt-result" aria-live="polite">{parsed.message}</span>
               )}
             </div>
+            <div className="bulk-options">
+              <label className="label" htmlFor="output-format">Output format</label>
+              <select
+                id="output-format"
+                className="format-select"
+                value={outputFormat}
+                onChange={(e) => setOutputFormat(e.target.value)}
+              >
+                {OUTPUT_FORMATS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
               className="btn-primary btn-full"
-              onClick={handleResize}
-              disabled={!file || status === 'processing' || status === 'asking-ai'}
+              onClick={handleResizeAll}
+              disabled={files.length === 0 || status === 'processing' || status === 'asking-ai'}
             >
-              {status === 'processing' ? 'Resizing...' : status === 'asking-ai' ? 'Asking AI...' 
-              : 'Resize Image'}
+              {status === 'processing' ? 'Resizing images...' : status === 'asking-ai' ? 'Asking AI...' : 'Resize all images'}
             </button>
             {error && <p className="error-text" role="alert" aria-live="assertive">{error}</p>}
           </div>
+
+          {files.length > 0 && (
+            <div className="file-list">
+              {files.map((fileItem) => (
+                <button
+                  type="button"
+                  key={fileItem.id}
+                  className={`file-item ${fileItem.id === activeFileId ? 'active' : ''}`}
+                  onClick={() => setActiveFileId(fileItem.id)}
+                >
+                  <img src={fileItem.preview} alt={fileItem.name} />
+                  <span>{fileItem.name}</span>
+                  <small>{fileItem.status === 'done' ? 'Ready' : fileItem.status === 'error' ? 'Error' : 'Idle'}</small>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="result-panel">
-          <div className="result-card">
-            <div className="result-header">
-              <h2>Result</h2>
-              {resultUrl && (
-                <button type="button" className="btn-download" onClick={handleDownload} aria-label="Download resized image as PNG">
-                  ⬇ Download PNG
-                </button>
-              )}
+          <div className="crop-board">
+            <div className="crop-header">
+              <h2>Drag crop frame</h2>
+              <button type="button" className="btn-ghost-sm" onClick={clearAll}>Clear all</button>
             </div>
-
-            <div className="result-preview">
-              {status === 'done' && resultUrl ? (
-                <img src={resultUrl} alt="Resized result" className="result-image" />
+            <div className="crop-preview">
+              {activeFile ? (
+                parsed ? (
+                  <div className="cropper-wrapper">
+                    <Cropper
+                      image={activeFile.preview}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={parsed.width / parsed.height}
+                      cropShape="rect"
+                      showGrid={false}
+                      onCropChange={(next) => {
+                        setCrop(next)
+                        updateFile(activeFile.id, { crop: next })
+                      }}
+                      onZoomChange={(next) => {
+                        setZoom(next)
+                        updateFile(activeFile.id, { zoom: next })
+                      }}
+                      onCropComplete={handleCropComplete}
+                    />
+                  </div>
+                ) : (
+                  <div className="result-empty">
+                    <p>Enter a prompt first to set the frame size.</p>
+                  </div>
+                )
               ) : (
                 <div className="result-empty">
-                  <p>{status === 'processing' ? 'Processing your image...' : 'Your resized image will appear here.'}</p>
+                  <p>Select an image to preview the drag crop frame.</p>
                 </div>
               )}
             </div>
+            {activeFile && parsed && (
+              <div className="crop-controls">
+                <label className="label">Zoom</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.01"
+                  value={zoom}
+                  onChange={(e) => {
+                    const next = Number(e.target.value)
+                    setZoom(next)
+                    updateFile(activeFile.id, { zoom: next })
+                  }}
+                />
+              </div>
+            )}
           </div>
+
+          <div className="result-card">
+            <div className="result-header">
+              <h2>Processed images</h2>
+              <button type="button" className="btn-download" onClick={handleDownloadZip} disabled={!files.some((fileItem) => fileItem.status === 'done')}>
+                ⬇ Download ZIP
+              </button>
+            </div>
+            <div className="processed-list">
+              {files.length === 0 ? (
+                <div className="result-empty">
+                  <p>No images uploaded yet.</p>
+                </div>
+              ) : (
+                files.map((fileItem) => (
+                  <div key={fileItem.id} className="processed-item">
+                    <img src={fileItem.preview} alt={fileItem.name} />
+                    <div>
+                      <strong>{fileItem.name}</strong>
+                      <p>{fileItem.status === 'done' ? `${fileItem.width}×${fileItem.height}` : fileItem.status}</p>
+                      {fileItem.error && <p className="error-text">{fileItem.error}</p>}
+                    </div>
+                    {fileItem.status === 'done' && (
+                      <button type="button" className="btn-download-sm" onClick={() => handleDownloadFile(fileItem)}>
+                        Download
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           <div className="examples-card">
             <h3>Try prompts like</h3>
             <ul>
