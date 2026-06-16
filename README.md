@@ -66,13 +66,3 @@ git push origin main
 
 Contributing
 - Fork, create a feature branch, and open a pull request. Keep changes focused and add tests where appropriate.
-
-License
-- MIT
-
-Contact
-- Author: Your name or contact info (update as needed)
-
----
-
-If you want, I can add badges, screenshots, or a short demo GIF to this README — tell me which you'd like and I will add them.

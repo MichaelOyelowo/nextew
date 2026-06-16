@@ -1,0 +1,273 @@
+.resize-page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.page-header {
+  margin-bottom: 28px;
+}
+
+.page-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 10px;
+}
+
+.page-sub {
+  font-size: 15px;
+  color: var(--text-muted);
+  max-width: 760px;
+  line-height: 1.6;
+}
+
+.resize-content {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 24px;
+}
+
+.resize-panel,
+.result-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.upload-card,
+.prompt-card,
+.result-card,
+.examples-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.upload-card {
+  display: grid;
+  gap: 18px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.upload-card.dragging {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.upload-preview {
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.upload-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.upload-placeholder span {
+  font-size: 40px;
+}
+
+.upload-button {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text-main);
+}
+
+.prompt-input {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  outline: none;
+  resize: vertical;
+  font-size: 15px;
+  color: var(--text-main);
+}
+
+.prompt-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+}
+
+.prompt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+.prompt-hint,
+.prompt-result {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.prompt-result {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.btn-full {
+  width: 100%;
+}
+
+.result-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.result-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.result-preview {
+  min-height: 320px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.result-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.result-empty {
+  color: var(--text-muted);
+  font-size: 15px;
+  text-align: center;
+  padding: 24px;
+}
+
+.examples-card h3 {
+  margin-top: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.examples-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.examples-card li {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.btn-download {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-download:hover {
+  background: #059669;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 13px 24px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error-text {
+  color: #dc2626;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .resize-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .resize-page {
+    padding: 24px 16px;
+  }
+
+  .upload-preview {
+    min-height: 200px;
+  }
+
+  .action-bar {
+    flex-direction: column;
+  }
+}

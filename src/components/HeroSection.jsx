@@ -216,7 +216,7 @@ function HeroSection() {
   }
 
   return (
-    <section className="hero">
+    <section className="hero" aria-labelledby="hero-title">
       <div className="hero-shape-bg" />
       <div className="mesh-gradient" />
 
@@ -226,7 +226,7 @@ function HeroSection() {
           <span className="badge-text">100% Client-Side Processing</span>
         </div>
 
-        <h1 className="hero-title">
+        <h1 className="hero-title" id="hero-title">
           The Future of <br />
           <span className="hero-title-accent">Image Optimization</span>
         </h1>
@@ -243,9 +243,18 @@ function HeroSection() {
 
           <div
             className={`hero-dropzone ${isDragging ? 'dragging' : ''}`}
+            role="button"
+            tabIndex="0"
+            aria-label="Upload or drop images here"
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                fileInputRef.current.click()
+              }
+            }}
             onClick={() => fileInputRef.current.click()}
           >
             <div className="dropzone-inner">
@@ -253,11 +262,13 @@ function HeroSection() {
               <h3 className="dropzone-title">Drop your images here</h3>
               <p className="dropzone-sub">Max 50MB per file · All formats</p>
               <button
+                type="button"
                 className="dropzone-btn"
                 onClick={(e) => {
                   e.stopPropagation()
                   fileInputRef.current.click()
                 }}
+                aria-label="Browse files to upload"
               >
                 Browse files
               </button>
@@ -277,6 +288,7 @@ function HeroSection() {
                       performConvert(files, isSelected);
                     }
                   }}
+                  aria-label="Convert automatically"
                 />
                 <span className="slider round"></span>
               </label>
@@ -288,11 +300,14 @@ function HeroSection() {
               {['AVIF', 'WEBP', 'JPEG', 'PNG'].map((fmt) => (
                 <button
                   key={fmt}
+                  type="button"
                   className={`chip ${isSelected.includes(fmt) ? 'chip-active' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleFileSelection(fmt)
                   }}
+                  aria-pressed={isSelected.includes(fmt)}
+                  aria-label={`Select ${fmt} format`}
                 >
                   {isSelected.includes(fmt) && <span className="chip-check">✓</span>}
                   {fmt}
@@ -304,7 +319,12 @@ function HeroSection() {
 
         {files.length > 0 && (
           <div className="file-preview-list">
-            <button className="btn-convert" onClick={handleConvert}>
+            <button
+              type="button"
+              className="btn-convert"
+              onClick={handleConvert}
+              aria-label={`Convert ${files.length} image${files.length > 1 ? 's' : ''} ${isSelected.length > 0 ? `to ${isSelected.join(', ')}` : ''}`}
+            >
               Convert {files.length} image{files.length > 1 ? 's' : ''}
               {isSelected.length > 0 ? ` to ${isSelected.join(', ')}` : ''}
             </button>
@@ -366,6 +386,7 @@ function HeroSection() {
 
             {files.filter(f => f.status === 'done').length > 0 && (
               <button
+                type="button"
                 className="btn-download-all"
                 onClick={async () => {
                   const zip = new JSZip();

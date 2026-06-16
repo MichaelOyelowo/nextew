@@ -11,13 +11,13 @@ function Navbar() {
 
 
     return (
-        <nav className="navbar">
+        <nav className="navbar" aria-label="Primary navigation">
             {/* logo */}
             <Link to="/" className="navbar-logo">
                 Next<span>ew</span>
             </Link>
             {/* Nav links */}
-            <ul className={`navbar-links ${isOpen ? 'open' : ''}`}>
+            <ul id="navbar-links" className={`navbar-links ${isOpen ? 'open' : ''}`}>
 
                 {/* Auth buttons - mobile only, sits at top */}
                 <li className="mobile-auth">
@@ -34,11 +34,18 @@ function Navbar() {
             </ul>
             {/* auth buttons */}
             <div className="navbar-auth">
-                <button className="btn-login">Login</button>
-                <button className="btn-signup">Sign Up</button>
+                <button type="button" className="btn-login">Login</button>
+                <button type="button" className="btn-signup">Sign Up</button>
             </div>
             {/* hamburger menu */}
-            <button className="hamburger" onClick={toggleMenu}>
+            <button
+                type="button"
+                className="hamburger"
+                onClick={toggleMenu}
+                aria-expanded={isOpen}
+                aria-controls="navbar-links"
+                aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            >
                 <span className={`bar ${isOpen ? 'open' : ''}`}></span>
                 <span className={`bar ${isOpen ? 'open' : ''}`}></span>
                 <span className={`bar ${isOpen ? 'open' : ''}`}></span>

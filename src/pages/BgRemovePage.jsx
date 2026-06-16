@@ -1,180 +1,302 @@
 import { useState, useRef } from 'react'
-import imageCompression from 'browser-image-compression'
 import './BgRemovePage.css'
 
 function BgRemovePage() {
-  const [file, setFile] = useState(null)
-  const [preview, setPreview] = useState(null)
-  const [prompt, setPrompt] = useState('')
-  const [resultUrl, setResultUrl] = useState(null)
-  const [resultName, setResultName] = useState('')
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState(null)
-  const [processing, setProcessing] = useState(false)
-  const inputRef = useRef(null)
+  const [files, setFiles] = useState([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [modelLoaded, setModelLoaded] = useState(false)
+  const fileInputRef = useRef(null)
+  const removeBackgroundRef = useRef(null)
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files?.[0]
-    if (!selected) return
-    setError(null)
-    setFile(selected)
-    setPreview(URL.createObjectURL(selected))
-    setResultUrl(null)
-    setResultName('')
-    setMessage('')
+  const handleFiles = (incoming) => {
+    const imageFiles = Array.from(incoming).filter(f =>
+      f.type.startsWith('image/')
+    )
+    const mapped = imageFiles.map(f => ({
+      id: crypto.randomUUID(),
+      file: f,
+      name: f.name,
+      size: f.size,
+      preview: URL.createObjectURL(f),
+      status: 'idle', // idle | processing | done | error
+      resultUrl: null,
+      resultBlob: null,
+      error: null,
+    }))
+    setFiles(prev => [...prev, ...mapped])
   }
 
-  const handleRemoveFile = () => {
-    if (preview) URL.revokeObjectURL(preview)
-    if (resultUrl) URL.revokeObjectURL(resultUrl)
-    setFile(null)
-    setPreview(null)
-    setPrompt('')
-    setResultUrl(null)
-    setResultName('')
-    setMessage('')
-    setError(null)
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    handleFiles(e.dataTransfer.files)
   }
 
-  const getPromptOptions = () => {
-    const promptText = prompt.toLowerCase()
-    const outputTypeMatch = promptText.match(/\b(png|webp|jpe?g|jpeg)\b/)
-    const widthHeightMatch = promptText.match(/(\d{2,4})\s*[xX]\s*(\d{2,4})/)
-
-    const options = {
-      maxSizeMB: 1,
-      useWebWorker: true,
-      fileType: file.type,
-      maxWidthOrHeight: 1600,
-      initialQuality: 0.75,
-      alwaysKeepResolution: false
-    }
-
-    if (outputTypeMatch) {
-      const type = outputTypeMatch[1].toLowerCase()
-      options.fileType = `image/${type === 'jpg' ? 'jpeg' : type}`
-    }
-
-    if (widthHeightMatch) {
-      options.maxWidthOrHeight = Math.max(
-        Number(widthHeightMatch[1]),
-        Number(widthHeightMatch[2])
-      )
-    }
-
-    if (promptText.includes('reduce') || promptText.includes('compress') || promptText.includes('small')) {
-      options.maxSizeMB = 0.5
-      options.initialQuality = 0.7
-    }
-
-    if (promptText.includes('high quality') || promptText.includes('best quality') || promptText.includes('retain detail')) {
-      options.initialQuality = 0.9
-    }
-
-    if (promptText.includes('low quality') || promptText.includes('lightweight') || promptText.includes('faster')) {
-      options.initialQuality = 0.6
-    }
-
-    return options
-  }
-
-  const handleProcessPrompt = async () => {
-    if (!file) {
-      setError('Please upload an image first.')
-      return
-    }
-    if (!prompt.trim()) {
-      setError('Please enter a prompt for what you want.')
-      return
-    }
-
-    const promptText = prompt.toLowerCase()
-    if (promptText.includes('remove background') || promptText.includes('remove bg')) {
-      setError('Background removal is not implemented yet. This page is preparing the AI prompt UI.')
-      setMessage('Future update: AI background removal will be powered by a backend or API.')
-      return
-    }
-
-    setError(null)
-    setMessage('Processing based on your prompt...')
-    setProcessing(true)
-
-    try {
-      const options = getPromptOptions()
-      const compressedFile = await imageCompression(file, options)
-      const url = URL.createObjectURL(compressedFile)
-      setResultUrl(url)
-      setResultName(`${file.name.replace(/\.[^.]+$/, '')}-processed.${options.fileType.split('/')[1]}`)
-      setMessage('Prompt processed successfully. Download the result below.')
-    } catch (err) {
-      setError(err.message || 'Failed to process prompt')
-      setMessage('')
-    } finally {
-      setProcessing(false)
+  const handleDropzoneKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      fileInputRef.current.click()
     }
   }
+
+  const updateFile = (id, updates) => {
+    setFiles(prev =>
+      prev.map(f => f.id === id ? { ...f, ...updates } : f)
+    )
+  }
+
+  const removeFile = (id) => {
+    setFiles(prev => prev.filter(f => f.id !== id))
+  }
+
+  const clearAll = () => setFiles([])
+
+  const processAll = async () => {
+    // Load the library once
+    if (!removeBackgroundRef.current) {
+      const { removeBackground } = await import('@imgly/background-removal')
+      removeBackgroundRef.current = removeBackground
+      setModelLoaded(true)
+    }
+
+    const idle = files.filter(f => f.status === 'idle')
+
+    // Process each file one by one
+    for (const f of idle) {
+      updateFile(f.id, { status: 'processing' })
+      try {
+        const blob = await removeBackgroundRef.current(f.file, {
+          model: 'small',
+          progress: (key, current, total) => {
+            console.log(`${f.name} — ${key}: ${current}/${total}`)
+          },
+        })
+        const resultUrl = URL.createObjectURL(blob)
+        updateFile(f.id, {
+          status: 'done',
+          resultUrl,
+          resultBlob: blob,
+        })
+      } catch (err) {
+        console.error(err)
+        updateFile(f.id, {
+          status: 'error',
+          error: 'Failed to process this image.',
+        })
+      }
+    }
+  }
+
+  const downloadFile = (f) => {
+    const a = document.createElement('a')
+    a.href = f.resultUrl
+    a.download = f.name.replace(/\.[^.]+$/, '') + '_nobg.png'
+    a.click()
+  }
+
+  const downloadAll = () => {
+    files.filter(f => f.status === 'done').forEach(downloadFile)
+  }
+
+  const isProcessing = files.some(f => f.status === 'processing')
+  const doneCount = files.filter(f => f.status === 'done').length
+  const idleCount = files.filter(f => f.status === 'idle').length
 
   return (
-    <div className="bg-remove-page">
-      <div className="bg-remove-card">
-        <h1>AI BG Remove & Prompt Assistant</h1>
-        <p>Upload an image, enter your prompt, and let the app prepare the conversion settings for you.</p>
+    <div className="bgremove-page">
 
-        <div className="bg-remove-actions">
-          <button onClick={() => inputRef.current?.click()} className="btn-primary">
-            Upload image
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-          />
-
-          {file && (
-            <button onClick={handleRemoveFile} className="btn-secondary">
-              Remove image
-            </button>
-          )}
+      {/* Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Remove Background</h1>
+          <p className="page-sub">
+            AI-powered · Batch processing · Runs entirely in your browser
+          </p>
         </div>
-
-        {preview && (
-          <div className="preview-area">
-            <img src={preview} alt={file?.name} className="preview-img" />
-          </div>
-        )}
-
-        <textarea
-          className="prompt-input"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Type a prompt like 'Reduce size to 200KB and convert to WebP' or 'Remove background and keep subject'"
-          rows={5}
-        />
-
-        <div className="convert-actions">
-          <button
-            className="btn-primary"
-            onClick={handleProcessPrompt}
-            disabled={processing || !file}
-          >
-            {processing ? 'Processing...' : 'Run Prompt'}
+        {files.length > 0 && (
+          <button type="button" className="btn-ghost-sm" onClick={clearAll} aria-label="Clear all selected images">
+            Clear all
           </button>
-        </div>
-
-        {error && <div className="error-text">{error}</div>}
-        {message && <div className="message-text">{message}</div>}
-
-        {resultUrl && (
-          <div className="result-block">
-            <p>Result ready. Download it below.</p>
-            <a href={resultUrl} download={resultName} className="btn-primary">
-              Download Result
-            </a>
-          </div>
         )}
       </div>
+
+      {/* Drop Zone — always visible when no files */}
+      {files.length === 0 ? (
+        <div
+          className={`dropzone ${isDragging ? 'dragging' : ''}`}
+          role="button"
+          tabIndex="0"
+          aria-label="Upload images by drag and drop or click to browse files"
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+          onDragLeave={() => setIsDragging(false)}
+          onKeyDown={handleDropzoneKeyDown}
+          onClick={() => fileInputRef.current.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            aria-label="Upload images"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+          <div className="dropzone-icon">
+            {isDragging ? '📂' : '✂️'}
+          </div>
+          <h3 className="dropzone-title">
+            {isDragging
+              ? 'Release to upload'
+              : 'Upload images to remove background'}
+          </h3>
+          <button className="dropzone-btn">Upload Images</button>
+          <p className="dropzone-sub">
+            Drop multiple images · PNG, JPEG, WebP supported
+          </p>
+        </div>
+      ) : (
+
+        <div className="workspace">
+
+          {/* Action Bar */}
+          <div className="action-bar" role="region" aria-label="Background removal actions">
+            <div className="action-bar-left">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={processAll}
+                disabled={isProcessing || idleCount === 0}
+                aria-busy={isProcessing}
+              >
+                {isProcessing
+                  ? 'Processing...'
+                  : `✂️ Remove BG from ${idleCount} image${idleCount !== 1 ? 's' : ''}`}
+              </button>
+
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => fileInputRef.current.click()}
+              >
+                + Add more
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => handleFiles(e.target.files)}
+              />
+            </div>
+
+            {doneCount > 1 && (
+              <div className="action-bar-right">
+                <button
+                  type="button"
+                  className="btn-download"
+                  onClick={downloadAll}
+                  aria-label={`Download all ${doneCount} processed images`}
+                >
+                  ⬇ Download all ({doneCount})
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Model loading notice */}
+          {!modelLoaded && (
+            <div className="model-notice">
+              ℹ️ First run downloads the AI model (~20MB). It's cached after that.
+            </div>
+          )}
+
+          {/* File Grid */}
+          <div className="file-grid">
+            {files.map(f => (
+              <div key={f.id} className={`file-card status-${f.status}`}>
+
+                {/* Images */}
+                <div className="card-images">
+                  <div className="card-img-wrap">
+                    <img src={f.preview} alt={f.name} className="card-img" />
+                    <span className="card-img-label">Before</span>
+                  </div>
+
+                  <div className="card-img-wrap">
+                    {f.status === 'done' && f.resultUrl ? (
+                      <>
+                        <img
+                          src={f.resultUrl}
+                          alt="result"
+                          className="card-img checkerboard"
+                        />
+                        <span className="card-img-label">After</span>
+                      </>
+                    ) : (
+                      <div className="card-img-placeholder">
+                        {f.status === 'processing' && (
+                          <>
+                            <div className="spinner" />
+                            <span>Processing...</span>
+                          </>
+                        )}
+                        {f.status === 'idle' && <span>Queued</span>}
+                        {f.status === 'error' && (
+                          <span className="error-text">Failed</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* File info */}
+                <div className="card-info">
+                  <span className="card-name" title={f.name}>{f.name}</span>
+                  <span className="card-size">
+                    {(f.size / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+
+                {/* Card actions */}
+                <div className="card-actions">
+                  {f.status === 'done' && (
+                    <button
+                      type="button"
+                      className="btn-download-sm"
+                      onClick={() => downloadFile(f)}
+                      aria-label={`Download processed image ${f.name}`}
+                    >
+                      ⬇ Download
+                    </button>
+                  )}
+                  {f.status === 'error' && (
+                    <span className="error-text">{f.error}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-remove-sm"
+                    onClick={() => removeFile(f.id)}
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+              </div>
+            ))}
+          </div>
+
+          {/* Privacy note */}
+          <p className="privacy-note">
+            🔒 Your images never leave your device. All processing happens locally.
+          </p>
+
+        </div>
+      )}
+
     </div>
   )
 }
