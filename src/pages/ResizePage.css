@@ -375,6 +375,8 @@
   font-size: 14px;
 }
 
+
+
 @media (max-width: 900px) {
   .resize-content {
     grid-template-columns: 1fr;
