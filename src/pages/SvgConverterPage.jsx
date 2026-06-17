@@ -78,11 +78,14 @@ function SvgConverterPage() {
       img.src = dataUrl
       await new Promise((resolve, reject) => {
         img.onload = resolve
-        img.onerror = () => reject(new Error('Unable to load image for vectorization'))
+        img.onerror = () => reject(new Error('Image load failed'))
+        // Ensure the image is actually decoded (Mobile fix)
+        if (img.decode) img.decode().then(resolve).catch(reject);
       })
 
-      // Resize down for performance
-      const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight))
+      // Mobile specific: Lower resolution to prevent crash
+      const mobileMax = window.innerWidth < 768 ? 512 : maxDim;
+      const scale = Math.min(1, mobileMax / Math.max(img.naturalWidth, img.naturalHeight));
       const canvas = document.createElement('canvas')
       canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
       canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
@@ -91,27 +94,25 @@ function SvgConverterPage() {
       const src = canvas.toDataURL()
 
       const options = {
-        numberofcolors: Number(numColors) || 16,
+        numberofcolors: mode === 'vector' ? (window.innerWidth < 768 ? 8 : numColors) : 16,
         strokewidth: 0,
-        scale: 1,
-        ltres: 1,
-        qtres: 1,
-        pathomit: 8
+        pathomit: 32, // Ignore tiny paths to save mobile memory
+        blurradius: 2
       }
 
       // ImageTracer.imageToSVG(src, options, callback)
-      ImageTracer.imageToSVG(src, (svgstr) => {
-        const blob = new Blob([svgstr], { type: 'image/svg+xml;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        setSvgUrl(url)
-        setSvgText(svgstr)
-      }, options)
+        ImageTracer.imageToSVG(canvas.toDataURL(), (svgstr) => {
+        const blob = new Blob([svgstr], { type: 'image/svg+xml;charset=utf-8' });
+        setSvgUrl(URL.createObjectURL(blob));
+        setSvgText(svgstr);
+        setProcessing(false);
+      }, options);
+
     } catch (err) {
-      setError(err.message || 'Vectorization failed')
-    } finally {
-      setProcessing(false)
+      setError("Mobile Error: Image too complex");
+      setProcessing(false);
     }
-  }
+  };
 
   const handleConvert = async () => {
     if (mode === 'raster') return handleEmbedRaster()
