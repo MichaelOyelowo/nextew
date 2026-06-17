@@ -38,7 +38,6 @@ function BgRemovePage() {
   const [isDragging, setIsDragging] = useState(false)
   const [modelLoaded, setModelLoaded] = useState(false)
   const fileInputRef = useRef(null)
-  const removeBackgroundRef = useRef(null)
 
   const handleFiles = (incoming) => {
     const imageFiles = Array.from(incoming).filter(f =>
@@ -84,51 +83,43 @@ function BgRemovePage() {
   const clearAll = () => setFiles([])
 
   const processAll = async () => {
-  if (!removeBackgroundRef.current) {
-    const { removeBackground } = await import('@imgly/background-removal')
-    removeBackgroundRef.current = removeBackground
-    setModelLoaded(true)
-  }
+    const idle = files.filter(f => f.status === 'idle')
 
-  const idle = files.filter(f => f.status === 'idle')
+    for (const f of idle) {
+      updateFile(f.id, { status: 'processing' })
+      try {
+        const maxDim = isMobile ? 600 : 1500
+        const pngBlob = await convertToPngBlob(f.file, maxDim)
 
-  for (const f of idle) {
-    updateFile(f.id, { status: 'processing' })
-    try {
-      const maxDim = isMobile ? 600 : 1500
-      const pngBlob = await convertToPngBlob(f.file, maxDim)
+        // Import fresh each time — avoids SharedArrayBuffer issues on mobile
+        const { removeBackground } = await import('@imgly/background-removal')
+        setModelLoaded(true)
 
-      const blob = await removeBackgroundRef.current(pngBlob, {
-        model: 'small',
-        progress: (key, current, total) => {
-          console.log(`${f.name} — ${key}: ${current}/${total}`)
-        },
-      })
+        const blob = await removeBackground(pngBlob, {
+          model: 'small',
+          device: 'cpu',
+          proxyToWorker: false, // Key fix — no SharedArrayBuffer needed
+          progress: (key, current, total) => {
+            console.log(`${f.name} — ${key}: ${current}/${total}`)
+          },
+        })
 
-      // Free the png blob from memory immediately
-      const resultUrl = URL.createObjectURL(blob)
-      updateFile(f.id, {
-        status: 'done',
-        resultUrl,
-        resultBlob: blob,
-      })
+        const resultUrl = URL.createObjectURL(blob)
+        updateFile(f.id, {
+          status: 'done',
+          resultUrl,
+          resultBlob: blob,
+        })
 
-      // Small delay between images on mobile — lets browser breathe
-      if (isMobile) {
-        await new Promise(resolve => setTimeout(resolve, 800))
+      } catch (err) {
+        console.error(err)
+        updateFile(f.id, {
+          status: 'error',
+          error: 'Failed to process this image.',
+        })
       }
-
-    } catch (err) {
-      console.error(err)
-      updateFile(f.id, {
-        status: 'error',
-        error: isMobile
-          ? 'Failed — try a smaller image (under 500KB)'
-          : 'Failed to process this image.',
-      })
     }
   }
-}
 
   const downloadFile = (f) => {
     const a = document.createElement('a')
@@ -148,7 +139,6 @@ function BgRemovePage() {
   return (
     <div className="bgremove-page">
 
-      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Remove Background</h1>
@@ -168,15 +158,12 @@ function BgRemovePage() {
         )}
       </div>
 
-      {/* Mobile warning */}
       {isMobile && (
         <div className="model-notice warning">
-          ⚠️ Mobile processing works best with images under 500KB.
-          Large images may take longer or fail due to memory limits.
+          ⚠️ On mobile, process one image at a time for best results.
         </div>
       )}
 
-      {/* Drop Zone */}
       {files.length === 0 ? (
         <div
           className={`dropzone ${isDragging ? 'dragging' : ''}`}
@@ -214,7 +201,6 @@ function BgRemovePage() {
       ) : (
         <div className="workspace">
 
-          {/* Action Bar */}
           <div className="action-bar" role="region" aria-label="Background removal actions">
             <div className="action-bar-left">
               <button
@@ -263,14 +249,12 @@ function BgRemovePage() {
             )}
           </div>
 
-          {/* Model loading notice */}
           {!modelLoaded && (
             <div className="model-notice">
               ℹ️ First run downloads the AI model (~20MB). It's cached after that.
             </div>
           )}
 
-          {/* File Grid */}
           <div className="file-grid">
             {files.map(f => (
               <div key={f.id} className={`file-card status-${f.status}`}>

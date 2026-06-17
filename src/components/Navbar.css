@@ -64,11 +64,10 @@
   padding: 9px 22px;
   border-radius: 8px;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: all 0.2s;
 }
 
 .btn-login:hover {
-  border-color: #7c5cfc;
   background: #f5f0f0;
 }
 
@@ -174,11 +173,15 @@
     border-left: 1px solid rgba(255, 255, 255, 0.07);
     flex-direction: column;
     align-items: flex-start;
+    /* Key fix — scrollable + padding for content */
     padding: 80px 24px 40px;
+    padding-top: 80px;
     gap: 0;
     transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 150;
     display: flex;
+    /* Make it scrollable if content overflows */
+    overflow-y: auto;
   }
 
   .navbar-links.open {
@@ -194,6 +197,7 @@
     margin-bottom: 24px;
     padding-bottom: 24px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
   }
 
   .mobile-auth .btn-login {
@@ -211,7 +215,6 @@
   }
 
   .mobile-auth .btn-login:hover {
-    border-color: #7c5cfc;
     background: #f5f0f0;
   }
 
@@ -255,6 +258,7 @@
     transition: opacity 0.3s ease, transform 0.3s ease;
     padding: 14px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
   }
 
   .navbar-links a {
@@ -264,10 +268,12 @@
     width: 100%;
   }
 
-  /* Stagger animation */
-  .navbar-links.open li:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 0.1s; }
-  .navbar-links.open li:nth-child(2) { opacity: 1; transform: translateX(0); transition-delay: 0.15s; }
-  .navbar-links.open li:nth-child(3) { opacity: 1; transform: translateX(0); transition-delay: 0.2s; }
-  .navbar-links.open li:nth-child(4) { opacity: 1; transform: translateX(0); transition-delay: 0.25s; }
-  .navbar-links.open li:nth-child(5) { opacity: 1; transform: translateX(0); transition-delay: 0.3s; }
+  /* Stagger animation — updated to cover all 7 items */
+  .navbar-links.open li:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 0.05s; }
+  .navbar-links.open li:nth-child(2) { opacity: 1; transform: translateX(0); transition-delay: 0.1s; }
+  .navbar-links.open li:nth-child(3) { opacity: 1; transform: translateX(0); transition-delay: 0.15s; }
+  .navbar-links.open li:nth-child(4) { opacity: 1; transform: translateX(0); transition-delay: 0.2s; }
+  .navbar-links.open li:nth-child(5) { opacity: 1; transform: translateX(0); transition-delay: 0.25s; }
+  .navbar-links.open li:nth-child(6) { opacity: 1; transform: translateX(0); transition-delay: 0.3s; }
+  .navbar-links.open li:nth-child(7) { opacity: 1; transform: translateX(0); transition-delay: 0.35s; }
 }
