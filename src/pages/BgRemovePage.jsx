@@ -162,17 +162,18 @@ function BgRemovePage() {
           {/* Action Bar */}
           <div className="action-bar" role="region" aria-label="Background removal actions">
             <div className="action-bar-left">
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={processAll}
-                disabled={isProcessing || idleCount === 0}
-                aria-busy={isProcessing}
-              >
-                {isProcessing
-                  ? 'Processing...'
-                  : `✂️ Remove BG from ${idleCount} image${idleCount !== 1 ? 's' : ''}`}
-              </button>
+             <button
+              type="button"
+              className="btn-primary"
+              onClick={processAll}
+              disabled={isProcessing || idleCount === 0}
+            >
+              {isProcessing
+                ? 'Processing...'
+                : idleCount === 0
+                ? '✅ All done'
+                : `✂️ Remove BG from ${idleCount} image${idleCount !== 1 ? 's' : ''}`}
+            </button>
 
               <button
                 type="button"
