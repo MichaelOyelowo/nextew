@@ -1,5 +1,4 @@
 import { useState, useRef } from 'react'
-import imageCompression from 'browser-image-compression'
 import JSZip from 'jszip'
 import './HeroSection.css';
 
@@ -18,8 +17,6 @@ function HeroSection() {
       preview: URL.createObjectURL(file)
     }))
     setFiles(selected);
-    
-    // Auto-convert if enabled and formats are selected
     if (autoConvert && isSelected.length > 0) {
       performConvert(selected, isSelected);
     }
@@ -35,8 +32,6 @@ function HeroSection() {
       preview: URL.createObjectURL(file)
     }))
     setFiles(dropped);
-    
-    // Auto-convert if enabled and formats are selected
     if (autoConvert && isSelected.length > 0) {
       performConvert(dropped, isSelected);
     }
@@ -46,14 +41,12 @@ function HeroSection() {
     setFiles((prev) => {
       const fileToRemove = prev[index];
       if (!fileToRemove) return prev;
-
       URL.revokeObjectURL(fileToRemove.preview);
       if (fileToRemove.results) {
         Object.values(fileToRemove.results).forEach((result) => {
           URL.revokeObjectURL(result.resultUrl);
         });
       }
-
       return prev.filter((_, idx) => idx !== index);
     });
   }
@@ -71,90 +64,73 @@ function HeroSection() {
     const nextSelection = isSelected.includes(fmt)
       ? isSelected.filter((f) => f !== fmt)
       : [...isSelected, fmt];
-
     setIsSelected(nextSelection);
-
-    // Auto-convert when a new format is selected and files already exist
     if (autoConvert && files.length > 0 && !isSelected.includes(fmt)) {
       performConvert(files, nextSelection);
     }
   };
 
-  const detectAVIFSupport = async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(blob && blob.type === 'image/avif');
-      }, 'image/avif', 0.5);
-    });
-  };
+  const convertImage = (file, format) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file.file)
 
-  const convertImage = async (file, format) => {
-    // For AVIF, check browser support first
-    if (format === 'AVIF') {
-      const avifSupported = await detectAVIFSupport();
-      if (!avifSupported) {
-        throw new Error('Your browser does not support AVIF. Converting to WEBP instead.');
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        const ctx = canvas.getContext('2d')
+
+        // White background for JPEG — no transparency
+        if (format === 'JPEG') {
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+        }
+
+        ctx.drawImage(img, 0, 0)
+        URL.revokeObjectURL(url)
+
+        const mimeMap = {
+          AVIF: 'image/avif',
+          WEBP: 'image/webp',
+          JPEG: 'image/jpeg',
+          PNG: 'image/png',
+        }
+
+        const qualityMap = {
+          AVIF: 0.5,
+          WEBP: 0.75,
+          JPEG: 0.75,
+          PNG: 1.0,
+        }
+
+        canvas.toBlob(blob => {
+          if (!blob) {
+            return reject(new Error(`${format} conversion failed`))
+          }
+          // Browser silently fell back to PNG
+          if (format !== 'PNG' && blob.type === 'image/png') {
+            return reject(new Error(`${format} not supported in this browser`))
+          }
+          resolve(blob)
+        }, mimeMap[format], qualityMap[format])
       }
 
-      // Use Canvas for AVIF conversion
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        reject(new Error('Failed to load image'))
+      }
 
-          canvas.toBlob((blob) => {
-            if (!blob) return reject(new Error('AVIF conversion failed'));
-            resolve(blob);
-          }, 'image/avif', 0.5);
-        };
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = file.preview;
-      });
-    }
-
-    // For JPEG, PNG, WEBP use browser-image-compression
-    const mimeMap = {
-      JPEG: 'image/jpeg',
-      PNG: 'image/png',
-      WEBP: 'image/webp'
-    };
-
-    const qualityMap = {
-      JPEG: 0.75,
-      PNG: 0.95,
-      WEBP: 0.7
-    };
-
-    const options = {
-      maxSizeMB: 50,
-      maxWidthOrHeight: 4096,
-      useWebWorker: true,
-      fileType: mimeMap[format],
-      quality: qualityMap[format]
-    };
-
-    try {
-      const compressedFile = await imageCompression(file.file, options);
-      return compressedFile;
-    } catch (err) {
-      throw new Error(`${format} conversion failed: ${err.message}`);
-    }
-  };
+      img.src = url
+    })
+  }
 
   const performConvert = async (filesToConvert, formats) => {
     if (filesToConvert.length === 0 || formats.length === 0) return;
 
-    // Update UI state to show processing
     setFiles((prev) =>
-      prev.map((f) => 
-        filesToConvert.some(fc => fc.name === f.name && fc.size === f.size) 
+      prev.map((f) =>
+        filesToConvert.some(fc => fc.name === f.name && fc.size === f.size)
           ? { ...f, status: 'processing' }
           : f
       )
@@ -163,44 +139,32 @@ function HeroSection() {
     const updated = await Promise.all(
       filesToConvert.map(async (f) => {
         try {
-          // Convert to all selected formats
           const results = {};
-          
           for (const format of formats) {
-            const blob = await convertImage(f, format);
-            
-            if (blob.size > f.size && format !== 'PNG') {
-              console.warn(`${f.name}: ${format} is larger than original`);
-            }
-
-            const resultUrl = URL.createObjectURL(blob);
-            const baseName = f.name.replace(/\.[^.]+$/, '');
-            const ext = format.toLowerCase();
-
+            const blob = await convertImage(f, format)
+            const resultUrl = URL.createObjectURL(blob)
+            const baseName = f.name.replace(/\.[^.]+$/, '')
+            const ext = format.toLowerCase()
             results[format] = {
               resultUrl,
               resultSize: blob.size,
               resultName: `${baseName}.${ext}`,
               isLarger: blob.size > f.size
-            };
+            }
           }
-
-          return {
-            ...f,
-            status: 'done',
-            results
-          };
+          return { ...f, status: 'done', results }
         } catch (err) {
-          return { ...f, status: 'error', error: err.message };
+          return { ...f, status: 'error', error: err.message }
         }
       })
     );
 
-    // Update the files in state, merging with existing ones
     setFiles((prev) =>
       prev.map((pf) => {
-        const updated_file = updated.find((uf) => uf.name === pf.name && uf.size === pf.size);
-        return updated_file || pf;
+        const updatedFile = updated.find(
+          (uf) => uf.name === pf.name && uf.size === pf.size
+        )
+        return updatedFile || pf
       })
     );
   };
@@ -211,7 +175,6 @@ function HeroSection() {
       alert('Please select at least one format')
       return
     }
-
     await performConvert(files, isSelected);
   }
 
@@ -323,7 +286,7 @@ function HeroSection() {
               type="button"
               className="btn-convert"
               onClick={handleConvert}
-              aria-label={`Convert ${files.length} image${files.length > 1 ? 's' : ''} ${isSelected.length > 0 ? `to ${isSelected.join(', ')}` : ''}`}
+              aria-label={`Convert ${files.length} image${files.length > 1 ? 's' : ''}`}
             >
               Convert {files.length} image{files.length > 1 ? 's' : ''}
               {isSelected.length > 0 ? ` to ${isSelected.join(', ')}` : ''}
@@ -346,6 +309,7 @@ function HeroSection() {
                     <span className="file-size original">
                       {(file.size / 1024).toFixed(1)} KB
                     </span>
+
                     {file.status === 'done' && file.results && (
                       <div className="format-results">
                         {Object.entries(file.results).map(([format, result]) => (
@@ -361,8 +325,8 @@ function HeroSection() {
                                 : `-${Math.round((1 - result.resultSize / file.size) * 100)}%`
                               }
                             </span>
-                            <a
-                              href={result.resultUrl}
+                            
+                             <a href={result.resultUrl}
                               download={result.resultName}
                               className="btn-download-format"
                             >
@@ -372,6 +336,7 @@ function HeroSection() {
                         ))}
                       </div>
                     )}
+
                     {file.status === 'error' && (
                       <span className="status-error">{file.error}</span>
                     )}
@@ -390,32 +355,27 @@ function HeroSection() {
                 className="btn-download-all"
                 onClick={async () => {
                   const zip = new JSZip();
-                  
                   for (const f of files.filter(f => f.status === 'done')) {
                     if (f.results) {
-                      // Create a folder for each image
-                      const folder = zip.folder(f.name.replace(/\.[^.]+$/, ''));
-                      
+                      const folder = zip.folder(f.name.replace(/\.[^.]+$/, ''))
                       for (const [format, result] of Object.entries(f.results)) {
                         try {
-                          const response = await fetch(result.resultUrl);
-                          const blob = await response.blob();
-                          folder.file(result.resultName, blob);
+                          const response = await fetch(result.resultUrl)
+                          const blob = await response.blob()
+                          folder.file(result.resultName, blob)
                         } catch (err) {
-                          console.error(`Failed to add ${result.resultName} to zip:`, err);
+                          console.error(`Failed to add ${result.resultName} to zip:`, err)
                         }
                       }
                     }
                   }
-                  
-                  // Generate and download the zip
-                  const zipBlob = await zip.generateAsync({ type: 'blob' });
-                  const zipUrl = URL.createObjectURL(zipBlob);
-                  const a = document.createElement('a');
-                  a.href = zipUrl;
-                  a.download = 'converted-images.zip';
-                  a.click();
-                  URL.revokeObjectURL(zipUrl);
+                  const zipBlob = await zip.generateAsync({ type: 'blob' })
+                  const zipUrl = URL.createObjectURL(zipBlob)
+                  const a = document.createElement('a')
+                  a.href = zipUrl
+                  a.download = 'converted-images.zip'
+                  a.click()
+                  URL.revokeObjectURL(zipUrl)
                 }}
               >
                 ⬇ Download all as ZIP
