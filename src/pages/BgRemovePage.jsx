@@ -1,6 +1,38 @@
 import { useState, useRef } from 'react'
 import './BgRemovePage.css'
 
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+const convertToPngBlob = (file, maxDim = 1500) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      let { naturalWidth: w, naturalHeight: h } = img
+      if (w > maxDim || h > maxDim) {
+        const scale = Math.min(maxDim / w, maxDim / h)
+        w = Math.round(w * scale)
+        h = Math.round(h * scale)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, w, h)
+      URL.revokeObjectURL(url)
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('Conversion failed'))
+        resolve(blob)
+      }, 'image/png')
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Failed to load image'))
+    }
+    img.src = url
+  })
+}
+
 function BgRemovePage() {
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
@@ -18,7 +50,7 @@ function BgRemovePage() {
       name: f.name,
       size: f.size,
       preview: URL.createObjectURL(f),
-      status: 'idle', // idle | processing | done | error
+      status: 'idle',
       resultUrl: null,
       resultBlob: null,
       error: null,
@@ -52,7 +84,6 @@ function BgRemovePage() {
   const clearAll = () => setFiles([])
 
   const processAll = async () => {
-    // Load the library once
     if (!removeBackgroundRef.current) {
       const { removeBackground } = await import('@imgly/background-removal')
       removeBackgroundRef.current = removeBackground
@@ -61,11 +92,14 @@ function BgRemovePage() {
 
     const idle = files.filter(f => f.status === 'idle')
 
-    // Process each file one by one
     for (const f of idle) {
       updateFile(f.id, { status: 'processing' })
       try {
-        const blob = await removeBackgroundRef.current(f.file, {
+        // Convert to PNG first — fixes AVIF, large WebP, and mobile failures
+        const maxDim = isMobile ? 800 : 1500
+        const pngBlob = await convertToPngBlob(f.file, maxDim)
+
+        const blob = await removeBackgroundRef.current(pngBlob, {
           model: 'small',
           progress: (key, current, total) => {
             console.log(`${f.name} — ${key}: ${current}/${total}`)
@@ -114,13 +148,26 @@ function BgRemovePage() {
           </p>
         </div>
         {files.length > 0 && (
-          <button type="button" className="btn-ghost-sm" onClick={clearAll} aria-label="Clear all selected images">
+          <button
+            type="button"
+            className="btn-ghost-sm"
+            onClick={clearAll}
+            aria-label="Clear all selected images"
+          >
             Clear all
           </button>
         )}
       </div>
 
-      {/* Drop Zone — always visible when no files */}
+      {/* Mobile warning */}
+      {isMobile && (
+        <div className="model-notice warning">
+          ⚠️ Mobile processing works best with images under 500KB.
+          Large images may take longer or fail due to memory limits.
+        </div>
+      )}
+
+      {/* Drop Zone */}
       {files.length === 0 ? (
         <div
           className={`dropzone ${isDragging ? 'dragging' : ''}`}
@@ -152,28 +199,28 @@ function BgRemovePage() {
           </h3>
           <button className="dropzone-btn">Upload Images</button>
           <p className="dropzone-sub">
-            Drop multiple images · PNG, JPEG, WebP supported
+            Drop multiple images · PNG, JPEG, WebP, AVIF supported
           </p>
         </div>
       ) : (
-
         <div className="workspace">
 
           {/* Action Bar */}
           <div className="action-bar" role="region" aria-label="Background removal actions">
             <div className="action-bar-left">
-             <button
-              type="button"
-              className="btn-primary"
-              onClick={processAll}
-              disabled={isProcessing || idleCount === 0}
-            >
-              {isProcessing
-                ? 'Processing...'
-                : idleCount === 0
-                ? '✅ All done'
-                : `✂️ Remove BG from ${idleCount} image${idleCount !== 1 ? 's' : ''}`}
-            </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={processAll}
+                disabled={isProcessing || idleCount === 0}
+                aria-busy={isProcessing}
+              >
+                {isProcessing
+                  ? 'Processing...'
+                  : idleCount === 0
+                  ? '✅ All done'
+                  : `✂️ Remove BG from ${idleCount} image${idleCount !== 1 ? 's' : ''}`}
+              </button>
 
               <button
                 type="button"
@@ -219,7 +266,6 @@ function BgRemovePage() {
             {files.map(f => (
               <div key={f.id} className={`file-card status-${f.status}`}>
 
-                {/* Images */}
                 <div className="card-images">
                   <div className="card-img-wrap">
                     <img src={f.preview} alt={f.name} className="card-img" />
@@ -253,7 +299,6 @@ function BgRemovePage() {
                   </div>
                 </div>
 
-                {/* File info */}
                 <div className="card-info">
                   <span className="card-name" title={f.name}>{f.name}</span>
                   <span className="card-size">
@@ -261,7 +306,6 @@ function BgRemovePage() {
                   </span>
                 </div>
 
-                {/* Card actions */}
                 <div className="card-actions">
                   {f.status === 'done' && (
                     <button
@@ -290,7 +334,6 @@ function BgRemovePage() {
             ))}
           </div>
 
-          {/* Privacy note */}
           <p className="privacy-note">
             🔒 Your images never leave your device. All processing happens locally.
           </p>

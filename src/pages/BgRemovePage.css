@@ -375,6 +375,13 @@
   font-weight: 600;
 }
 
+.model-notice.warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #92400e;
+  border-left: 3px solid #f97316;
+}
+
 /* Mobile */
 @media (max-width: 640px) {
   .file-grid {
