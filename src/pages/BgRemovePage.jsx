@@ -84,42 +84,51 @@ function BgRemovePage() {
   const clearAll = () => setFiles([])
 
   const processAll = async () => {
-    if (!removeBackgroundRef.current) {
-      const { removeBackground } = await import('@imgly/background-removal')
-      removeBackgroundRef.current = removeBackground
-      setModelLoaded(true)
-    }
+  if (!removeBackgroundRef.current) {
+    const { removeBackground } = await import('@imgly/background-removal')
+    removeBackgroundRef.current = removeBackground
+    setModelLoaded(true)
+  }
 
-    const idle = files.filter(f => f.status === 'idle')
+  const idle = files.filter(f => f.status === 'idle')
 
-    for (const f of idle) {
-      updateFile(f.id, { status: 'processing' })
-      try {
-        // Convert to PNG first — fixes AVIF, large WebP, and mobile failures
-        const maxDim = isMobile ? 800 : 1500
-        const pngBlob = await convertToPngBlob(f.file, maxDim)
+  for (const f of idle) {
+    updateFile(f.id, { status: 'processing' })
+    try {
+      const maxDim = isMobile ? 600 : 1500
+      const pngBlob = await convertToPngBlob(f.file, maxDim)
 
-        const blob = await removeBackgroundRef.current(pngBlob, {
-          model: 'small',
-          progress: (key, current, total) => {
-            console.log(`${f.name} — ${key}: ${current}/${total}`)
-          },
-        })
-        const resultUrl = URL.createObjectURL(blob)
-        updateFile(f.id, {
-          status: 'done',
-          resultUrl,
-          resultBlob: blob,
-        })
-      } catch (err) {
-        console.error(err)
-        updateFile(f.id, {
-          status: 'error',
-          error: 'Failed to process this image.',
-        })
+      const blob = await removeBackgroundRef.current(pngBlob, {
+        model: 'small',
+        progress: (key, current, total) => {
+          console.log(`${f.name} — ${key}: ${current}/${total}`)
+        },
+      })
+
+      // Free the png blob from memory immediately
+      const resultUrl = URL.createObjectURL(blob)
+      updateFile(f.id, {
+        status: 'done',
+        resultUrl,
+        resultBlob: blob,
+      })
+
+      // Small delay between images on mobile — lets browser breathe
+      if (isMobile) {
+        await new Promise(resolve => setTimeout(resolve, 800))
       }
+
+    } catch (err) {
+      console.error(err)
+      updateFile(f.id, {
+        status: 'error',
+        error: isMobile
+          ? 'Failed — try a smaller image (under 500KB)'
+          : 'Failed to process this image.',
+      })
     }
   }
+}
 
   const downloadFile = (f) => {
     const a = document.createElement('a')
