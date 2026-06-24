@@ -163,3 +163,17 @@
   overflow: hidden;
   border-radius: 8px;
 }
+
+@media (max-width: 360px) {
+  .cf-turnstile {
+    transform: scale(0.85);
+    transform-origin: left center;
+  }
+}
+
+@media (max-width: 320px) {
+  .cf-turnstile {
+    transform: scale(0.75);
+    transform-origin: left center;
+  }
+}
