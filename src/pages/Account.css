@@ -1,0 +1,170 @@
+.account-page {
+  min-height: 100vh;
+  background: #f8faff;
+  display: flex;
+  justify-content: center;
+  padding: 3rem 1rem;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.account-card {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 0 0 1px rgba(99,102,241,0.06), 0 20px 40px -10px rgba(34,211,238,0.1);
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 0.25rem;
+}
+
+.avatar-preview {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar-uploading-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #0f172a;
+  margin: 0 0 0.4rem;
+}
+
+.btn-change-avatar {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-change-avatar:hover { border-color: #a855f7; color: #a855f7; }
+.btn-change-avatar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Make sure the spinner style from earlier still covers this size */
+.avatar-uploading-overlay .spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+.account-email {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.upgrade-banner {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(34,211,238,0.08), rgba(168,85,247,0.08));
+}
+
+.upgrade-banner h3 { font-family: 'Syne', sans-serif; margin: 0 0 0.25rem; font-size: 1rem; }
+.upgrade-banner p { margin: 0 0 0.85rem; font-size: 0.85rem; color: #64748b; }
+
+.btn-upgrade {
+  border: none;
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.account-section { margin-top: 1.5rem; }
+
+.account-section h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin: 0 0 0.5rem;
+}
+
+.danger-heading { color: #dc2626; }
+
+.account-row {
+  width: 100%;
+  text-align: left;
+  background: #f8faff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.danger-row { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(15,23,42,0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.75rem;
+  max-width: 380px;
+  width: 100%;
+}
+
+.modal-card h3 { font-family: 'Syne', sans-serif; margin: 0 0 0.75rem; }
+.modal-card p { font-size: 0.85rem; color: #64748b; margin: 0 0 0.5rem; }
+.modal-instruction { color: #1e293b !important; }
+
+.modal-card input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+.btn-ghost {
+  background: none; border: 1px solid #e2e8f0;
+  padding: 0.6rem 1rem; border-radius: 10px; cursor: pointer;
+}
+
+.btn-danger {
+  background: #dc2626; color: #fff; border: none;
+  padding: 0.6rem 1rem; border-radius: 10px; cursor: pointer;
+}
+
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }

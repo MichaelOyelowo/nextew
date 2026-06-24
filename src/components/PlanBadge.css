@@ -1,0 +1,10 @@
+/* PlanBadge.css */
+.plan-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.plan-free { background: #f1f5f9; color: #64748b; }
+.plan-paid { background: linear-gradient(90deg, #22d3ee, #a855f7); color: #fff; }
