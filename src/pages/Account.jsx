@@ -29,7 +29,7 @@ export default function Account() {
 
       const { data } = await supabase
         .from('profiles')
-        .select('plan, created_at')
+        .select('plan, created_at, avatar_url')
         .eq('id', session.user.id)
         .single()
 

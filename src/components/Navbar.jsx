@@ -4,60 +4,64 @@ import { supabase } from '../lib/supabase'
 import UserMenu, { Avatar } from './UserMenu'
 import './Navbar.css'
 
-
 function Navbar() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [user, setUser] = useState(null);
+    const [isOpen, setIsOpen] = useState(false)
+    const [user, setUser] = useState(null)
+    const [profileAvatarUrl, setProfileAvatarUrl] = useState(null)
+
+    const fetchAvatar = async (userId) => {
+        const { data } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', userId)
+            .single()
+        setProfileAvatarUrl(data?.avatar_url ?? null)
+    }
 
     useEffect(() => {
-        // Check current session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setUser(session?.user ?? null)
+            if (session?.user) fetchAvatar(session.user.id)
         })
 
-        // Listen for changes (login/logout)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user ?? null)
+            if (session?.user) fetchAvatar(session.user.id)
+            else setProfileAvatarUrl(null)
         })
 
         return () => subscription.unsubscribe()
     }, [])
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
-        setIsOpen(false);
+        await supabase.auth.signOut()
+        setIsOpen(false)
     }
 
-    const toggleMenu = () => {
-        setIsOpen(!isOpen);
-    }
-
+    const toggleMenu = () => setIsOpen(!isOpen)
 
     return (
         <nav className="navbar" aria-label="Primary navigation">
-            {/* logo */}
             <Link to="/" className="navbar-logo">
                 Next<span>ew</span>
             </Link>
-            {/* Nav links */}
-            <ul id="navbar-links" className={`navbar-links ${isOpen ? 'open' : ''}`}>
 
-                {/* Mobile Auth */}
+            <ul id="navbar-links" className={`navbar-links ${isOpen ? 'open' : ''}`}>
                 <li className="mobile-auth">
-                {!user ? (
-                    <>
-                    <Link to="/login" className="btn-login" onClick={() => setIsOpen(false)}>Login</Link>
-                    <Link to="/signup" className="btn-signup" onClick={() => setIsOpen(false)}>Sign Up</Link>
-                    </>
-                ) : (
-                    <div className="mobile-user-block">
-                    <Link to="/account" className="mobile-user-row" onClick={() => setIsOpen(false)}>
-                        <Avatar user={user} size={32} />
-                        <span>{user.user_metadata?.full_name || user.email.split('@')[0]}</span>
-                    </Link>
-                    <button onClick={handleLogout} className="btn-login">Logout</button>
-                    </div>
-                )}
+                    {!user ? (
+                        <>
+                            <Link to="/login" className="btn-login" onClick={() => setIsOpen(false)}>Login</Link>
+                            <Link to="/signup" className="btn-signup" onClick={() => setIsOpen(false)}>Sign Up</Link>
+                        </>
+                    ) : (
+                        <div className="mobile-user-block">
+                            <Link to="/account" className="mobile-user-row" onClick={() => setIsOpen(false)}>
+                                <Avatar user={user} profileAvatarUrl={profileAvatarUrl} size={32} />
+                                <span>{user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0]}</span>
+                            </Link>
+                            <button onClick={handleLogout} className="btn-login">Logout</button>
+                        </div>
+                    )}
                 </li>
 
                 <li><Link to="/" onClick={() => setIsOpen(false)}>Home</Link></li>
@@ -67,18 +71,18 @@ function Navbar() {
                 <li><Link to="/resize" onClick={() => setIsOpen(false)}>Resize</Link></li>
                 <li><Link to="/pricing" onClick={() => setIsOpen(false)}>Pricing</Link></li>
             </ul>
-            {/* Desktop Auth */}
+
             <div className="navbar-auth">
                 {!user ? (
                     <>
-                    <Link to="/login" className="btn-login">Login</Link>
-                    <Link to="/signup" className="btn-signup">Sign Up</Link>
+                        <Link to="/login" className="btn-login">Login</Link>
+                        <Link to="/signup" className="btn-signup">Sign Up</Link>
                     </>
                 ) : (
                     <UserMenu user={user} />
                 )}
             </div>
-            {/* hamburger menu */}
+
             <button
                 type="button"
                 className="hamburger"
@@ -95,4 +99,4 @@ function Navbar() {
     )
 }
 
-export default Navbar;
+export default Navbar
