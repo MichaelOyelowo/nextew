@@ -185,8 +185,8 @@ function HeroSection() {
 
       <div className="hero-content">
         <div className="hero-badge">
-          <span className="badge-dot"></span>
-          <span className="badge-text">100% Client-Side Processing</span>
+          {/* <span className="badge-dot"></span> */}
+          <span className="badge-text">Fast Loading Client-Side Processing</span>
         </div>
 
         <h1 className="hero-title" id="hero-title">

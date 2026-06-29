@@ -445,3 +445,25 @@ entrypoint = "./functions/verify-turnstile/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/verify-turnstile/*.html" ]
+
+[functions.track-session]
+enabled = true
+verify_jwt = false
+import_map = "./functions/track-session/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/track-session/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/track-session/*.html" ]
+
+[functions.revoke-session]
+enabled = true
+verify_jwt = false
+import_map = "./functions/revoke-session/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/revoke-session/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/revoke-session/*.html" ]

@@ -168,3 +168,106 @@
 }
 
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sessions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.sessions-header h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.btn-revoke-all {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #a855f7;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.btn-revoke-all:hover { text-decoration: underline; }
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: #f8faff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.session-icon { font-size: 1.3rem; flex-shrink: 0; }
+
+.session-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.session-device {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-current {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+
+.session-location {
+  font-size: 0.78rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-revoke {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #dc2626;
+  background: none;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.btn-revoke:hover { background: #fef2f2; }
+
+.sessions-loading {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  text-align: center;
+  padding: 1rem;
+}
