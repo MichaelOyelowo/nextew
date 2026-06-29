@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
     if (error || !user) return new Response('Invalid token', { status: 401, headers: corsHeaders })
 
-    const { session_id } = await req.json()
+    const { session_id, refresh_token } = await req.json()
     const userAgent = req.headers.get('user-agent') || ''
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'Unknown'
 
@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
     await supabaseAdmin.from('user_sessions').upsert({
       user_id: user.id,
       session_id,
+      refresh_token,
       browser,
       os,
       device_type: deviceType,

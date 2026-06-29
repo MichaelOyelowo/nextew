@@ -24,14 +24,42 @@ Deno.serve(async (req) => {
     const { session_id, revoke_all_others } = await req.json()
 
     if (revoke_all_others) {
-      // Delete all sessions except current one from our tracking table
+      // Get all other sessions' refresh tokens
+      const { data: otherSessions } = await supabaseAdmin
+        .from('user_sessions')
+        .select('refresh_token')
+        .eq('user_id', user.id)
+        .neq('session_id', session_id)
+
+      // Revoke each refresh token via Supabase Auth admin
+      for (const s of otherSessions || []) {
+        if (s.refresh_token) {
+          await supabaseAdmin.auth.admin.signOut(s.refresh_token, 'others')
+        }
+      }
+
+      // Clean up our tracking table
       await supabaseAdmin
         .from('user_sessions')
         .delete()
         .eq('user_id', user.id)
         .neq('session_id', session_id)
+
     } else {
-      // Delete specific session
+      // Get this session's refresh token
+      const { data: sessionData } = await supabaseAdmin
+        .from('user_sessions')
+        .select('refresh_token')
+        .eq('session_id', session_id)
+        .eq('user_id', user.id)
+        .single()
+
+      // Actually revoke the auth session
+      if (sessionData?.refresh_token) {
+        await supabaseAdmin.auth.admin.signOut(sessionData.refresh_token, 'others')
+      }
+
+      // Clean up our tracking table
       await supabaseAdmin
         .from('user_sessions')
         .delete()
@@ -43,7 +71,8 @@ Deno.serve(async (req) => {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
-  } catch {
+  } catch (err) {
+    console.error(err)
     return new Response('Error', { status: 500, headers: corsHeaders })
   }
 })

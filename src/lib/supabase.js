@@ -20,6 +20,9 @@ export async function trackSession() {
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ session_id: sessionId }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      refresh_token: session.refresh_token,
+    }),
   })
 }
